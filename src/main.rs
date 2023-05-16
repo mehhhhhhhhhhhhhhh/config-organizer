@@ -3,7 +3,7 @@ mod variable_definitions;
 
 use environment_definitions::EnvironmentDefinitions;
 
-use std::{env, io};
+use std::{env, fs, io};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fs::File;
@@ -44,11 +44,16 @@ fn main() -> io::Result<()> {
 
     for (name, def) in envs {
         println!("{}:\n  {:?}", &name, &def);
+
+        let output_dir = Path::new(&format!("envs2/{}/configs", &name)).to_path_buf();
+        fs::create_dir_all(&output_dir)?;
+        println!("    {:?}", &output_dir);
+
         for var_source in def.configuration.variables {
             println!("    {}", &var_source);
             let path = format!("configuration/variables/{}.yml", &var_source);
             let shit = cache.load(Path::new(&path));
-            eprintln!("      {:?}", shit);
+            println!("      {:?}", shit);
         }
     }
     Ok(())
