@@ -1,4 +1,5 @@
 mod environment_definitions;
+mod variable_definitions;
 
 use environment_definitions::EnvironmentDefinitions;
 
@@ -23,6 +24,12 @@ fn main() -> io::Result<()> {
 
     for (name, def) in envs {
         println!("{}:\n  {:?}", &name, &def);
+        for var_source in def.configuration.variables {
+            println!("    {}", &var_source);
+            let path = format!("configuration/variables/{}.yml", &var_source);
+            let shit = variable_definitions::load(Path::new(&path));
+            eprintln!("      {:?}", shit);
+        }
     }
     Ok(())
 }

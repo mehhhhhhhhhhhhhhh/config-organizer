@@ -24,11 +24,11 @@ pub(crate) struct EnvDef {
     reduced_memory: bool,
     #[serde(default="falsev")]
     debug_ports: bool,
-    configuration: ConfDef,
+    pub configuration: ConfDef,
     mocks: Vec<String>,
 }
 
 #[derive(Deserialize, Debug)]
 pub(crate) struct ConfDef {
-    variables: Vec<String>,
+    pub variables: Vec<String>,
 }
