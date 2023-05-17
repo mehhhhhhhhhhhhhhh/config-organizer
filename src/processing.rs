@@ -5,22 +5,24 @@ use std::path::PathBuf;
 use serde_yaml::Mapping;
 use crate::variable_definitions::VariableSource;
 
-pub(crate) enum ProcessingType {
+pub(crate) enum Format {
     Yaml, Text
 }
+// TODO support working in YAML but with Canonical JSON (RFC) output
+
 pub(crate) struct Template {
     pub(crate) filename: PathBuf,
-    pub(crate) processing_type: ProcessingType,
+    pub(crate) format: Format,
     pub(crate) source_path: PathBuf,
 }
 
 pub(crate) fn process(template: &Template, source: &VariableSource, destination: &mut dyn Write) -> io::Result<()> {
-    match template.processing_type {
-        ProcessingType::Yaml => {
+    match template.format {
+        Format::Yaml => {
             let content: Mapping = serde_yaml::from_reader(File::open(&template.source_path)?).unwrap();
             process_yaml(content, source, destination);
         }
-        ProcessingType::Text => { panic!("Aaagh! This isn't YAML!") }
+        Format::Text => { panic!("Aaagh! This isn't YAML!") }
     }
     Ok(())
 }

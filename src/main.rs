@@ -3,7 +3,7 @@ mod variable_definitions;
 mod processing;
 
 use environment_definitions::EnvironmentDefinitions;
-use processing::{Template, ProcessingType};
+use processing::{Template, Format};
 use variable_definitions::VariableSource;
 
 use std::{env, fs, io};
@@ -39,7 +39,7 @@ impl VarDefParseCache {
 fn get_templates() -> Vec<Template> {
     vec![Template {
         filename: PathBuf::from("auth-service.yml"),
-        processing_type: ProcessingType::Yaml,
+        format: Format::Yaml,
         source_path: PathBuf::from("configuration/templates/auth-service.yml"),
     }]
     // TODO return all the others too...
@@ -72,10 +72,11 @@ fn main() -> io::Result<()> {
             //println!("      {:?}", shit);
         }
 
-        let uber_source : VariableSource = variable_definitions::combine(var_sources.iter().map(|x| x.deref()).collect());
+        let combined_source : VariableSource = variable_definitions::combine(var_sources.iter().map(|x| x.deref()).collect());
+        eprintln!("{:?}", &combined_source);
 
         for template in get_templates() {
-            processing::process(&template, &uber_source, &mut File::create(output_dir.join(&template.filename))?)?;
+            processing::process(&template, &combined_source, &mut File::create(output_dir.join(&template.filename))?)?;
         }
     }
     Ok(())
