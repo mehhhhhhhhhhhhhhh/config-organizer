@@ -47,3 +47,14 @@ pub(crate) fn load(path: &Path) -> io::Result<VariableSource> {
         mutations: mutations,
     })
 }
+
+pub(crate) fn combine(sources: Vec<&VariableSource>) -> VariableSource {
+    let mut all_defs : HashMap<String, Value> = HashMap::new();
+    for source in sources.iter() {
+        all_defs.extend(source.definitions.iter().map(|(k,v)| (k.clone(), v.clone())));
+    }
+    VariableSource {
+        definitions: all_defs,
+        mutations: sources.iter().flat_map(|s| s.mutations.clone()).collect(),
+    }
+}
