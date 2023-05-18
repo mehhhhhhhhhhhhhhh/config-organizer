@@ -10,7 +10,7 @@ type ValuePath = Vec<String>;
 
 #[derive(Debug, Clone)]
 pub(crate) struct Mutation {
-    pub(crate) filename_pattern: String,
+    pub(crate) filename_pattern: String,  // TODO is it actually just an exact match? is an exact match sufficient?
     pub(crate) action: MutationAction,
 }
 #[derive(Debug, Clone)]

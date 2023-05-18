@@ -73,7 +73,7 @@ fn main() -> io::Result<()> {
         }
 
         let combined_source : VariableSource = variable_definitions::combine(var_sources.iter().map(|x| x.deref()).collect());
-        eprintln!("{:?}", &combined_source);
+        //eprintln!("{:?}", &combined_source.mutations.iter().map(|m| &m.filename_pattern).collect::<Vec<_>>());
 
         for template in get_templates() {
             processing::process(&template, &combined_source, &mut File::create(output_dir.join(&template.filename))?)?;

@@ -2,8 +2,8 @@ use std::fs::File;
 use std::io;
 use std::io::Write;
 use std::path::PathBuf;
-use serde_yaml::Mapping;
-use crate::variable_definitions::VariableSource;
+use serde_yaml::{Mapping, Value};
+use crate::variable_definitions::{Mutation, MutationAction, VariableSource};
 
 pub(crate) enum Format {
     Yaml, Text
@@ -16,20 +16,45 @@ pub(crate) struct Template {
     pub(crate) source_path: PathBuf,
 }
 
+fn navigate_mapping<'a>(mapping: &'a Mapping, path: &[String]) -> &'a Mapping {
+    if path.len() == 0 {
+        return &mapping
+    }
+    let next = mapping.get(path.get(0).expect("WTF")).expect("WTF");
+    if let Value::Mapping(m) = next {
+        return navigate_mapping(m, &path[1..])
+    }
+    panic!()
+}
+
+fn apply_mutation(mutation: &MutationAction, content: &mut Mapping){
+    match mutation {
+        MutationAction::Add(path, Value::Mapping(new_entries)) => {}
+        MutationAction::Add(path, Value::Sequence(new_elems)) => {}
+        MutationAction::Add(path, _) => { panic!("Add mutation is trying to add non-mapping, non-sequence values") }
+        MutationAction::Remove(path) => {}
+        MutationAction::Replace(path, v) => {}
+    }
+}
+
 pub(crate) fn process(template: &Template, source: &VariableSource, destination: &mut dyn Write) -> io::Result<()> {
     match template.format {
         Format::Yaml => {
             let content: Mapping = serde_yaml::from_reader(File::open(&template.source_path)?).unwrap();
-            process_yaml(content, source, destination);
+            process_yaml(content, template.filename.to_string_lossy().to_string(), source, destination)?;
         }
         Format::Text => { panic!("Aaagh! This isn't YAML!") }
     }
     Ok(())
 }
 
-pub(crate) fn process_yaml(template: Mapping, source: &VariableSource, destination: &mut dyn Write) -> io::Result<()> {
-    // TODO mutatations
+pub(crate) fn process_yaml(mut content: Mapping, filename: String, source: &VariableSource, destination: &mut dyn Write) -> io::Result<()> {
+    for mutation in &source.mutations {
+        if mutation.filename_pattern == filename {
+            apply_mutation(&mutation.action, &mut content);
+        }
+    }
     // TODO walk and expand
-    serde_yaml::to_writer(destination, &template);
+    serde_yaml::to_writer(destination, &content);  // TODO handle errors
     Ok(())
 }
