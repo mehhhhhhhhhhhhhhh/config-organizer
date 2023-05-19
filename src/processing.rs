@@ -42,7 +42,7 @@ trait Navigate {
 }
 impl Navigate for Mapping {
     fn navigate(&mut self, path: &[String]) -> &mut Value {
-        let next = self.get_mut(path.get(0).expect("WTF")).expect("WTF");
+        let next = self.get_mut(path.get(0).expect(&format!("WTF, regarding path {:?}", &path))).expect(&format!("WTF, regarding missing value at {:?}", &path));
         return next.navigate(&path[1..])
     }
 }
@@ -55,7 +55,7 @@ impl Navigate for Value {
     }
 }
 
-fn apply_mutation(mutation: &MutationAction, content: &mut Mapping){
+fn apply_mutation(mutation: &MutationAction, content: &mut Value){
     match mutation {
         MutationAction::Add(path, Value::Mapping(new_entries)) => {
             let current = mapping_value(content.navigate(&path)).expect("urm");
@@ -171,7 +171,7 @@ pub(crate) fn process(template: &Template, environment: &Environment, destinatio
 fn process_yaml(mut content: Value, filename: String, environment: &Environment, destination: &mut dyn Write) -> io::Result<()> {
     for mutation in &environment.definitions.mutations {
         if mutation.filename_pattern == filename {
-            apply_mutation(&mutation.action, mapping_value(&mut content).expect("not a mapping"));
+            apply_mutation(&mutation.action, &mut content);
         }
     }
     let content = expand(content, environment);
