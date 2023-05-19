@@ -81,10 +81,25 @@ fn apply_mutation(mutation: &MutationAction, content: &mut Mapping){
     }
 }
 
+fn expand_string(string: String, source: &VariableSource) -> Value {
+    Value::String(string)
+}
+fn expand(mut content: Value, source: &VariableSource) -> Value {
+    match content {
+        Value::Null => Value::Null,
+        Value::Bool(a) => Value::Bool(a),
+        Value::Number(a) => Value::Number(a),
+        Value::String(str) => expand_string(str, source),
+        Value::Sequence(seq) => Value::Sequence(seq.into_iter().map(|v| expand(v, source)).collect()),
+        Value::Mapping(map) => Value::Mapping(map.into_iter().map(|(k,v)| (k, expand(v, source))).collect()),
+        Value::Tagged(_) => { panic!("what the fuck is this?") }
+    }
+}
+
 pub(crate) fn process(template: &Template, source: &VariableSource, destination: &mut dyn Write) -> io::Result<()> {
     match template.format {
         Format::Yaml => {
-            let content: Mapping = serde_yaml::from_reader(File::open(&template.source_path)?).unwrap();
+            let content: Value = serde_yaml::from_reader(File::open(&template.source_path)?).unwrap();
             process_yaml(content, template.filename.to_string_lossy().to_string(), source, destination)?;
         }
         Format::Text => { panic!("Aaagh! This isn't YAML!") }
@@ -92,13 +107,13 @@ pub(crate) fn process(template: &Template, source: &VariableSource, destination:
     Ok(())
 }
 
-pub(crate) fn process_yaml(mut content: Mapping, filename: String, source: &VariableSource, destination: &mut dyn Write) -> io::Result<()> {
+pub(crate) fn process_yaml(mut content: Value, filename: String, source: &VariableSource, destination: &mut dyn Write) -> io::Result<()> {
     for mutation in &source.mutations {
         if mutation.filename_pattern == filename {
-            apply_mutation(&mutation.action, &mut content);
+            apply_mutation(&mutation.action, mapping_value(&mut content).expect("not a mapping"));
         }
     }
-    // TODO walk and expand
+    let content = expand(content, source);
     serde_yaml::to_writer(destination, &content);  // TODO handle errors
     Ok(())
 }
