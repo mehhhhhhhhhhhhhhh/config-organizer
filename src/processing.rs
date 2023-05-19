@@ -126,12 +126,20 @@ fn lookup(reference_name: &str, environment: &Environment) -> Value {
 
 fn expand_string(string: String, environment: &Environment) -> Value {
     let lpos = string.find("((");
-    let rpos = string.rfind("))");
+    let rpos = string.find("))");
     if let Some(lpos) = lpos {
         if let Some(rpos) = rpos {
             let reference_name = &string[lpos+2..rpos].trim();
             if lpos == 0 && rpos == (string.len()-2) {
                 return lookup(reference_name, environment)
+            } else {
+                let val = lookup(reference_name, environment);
+                let str_val = match val {
+                    Value::Number(n) => format!("{}", n),
+                    Value::String(str) => str,
+                    val => panic!("Attempted to interpolate non-string value \"{}\" ({:?})", reference_name, val),
+                };
+                return expand_string(string[..lpos].to_string() + &str_val + &string[rpos+2..], environment)
             }
         }
     }
