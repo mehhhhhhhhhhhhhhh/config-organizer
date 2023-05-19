@@ -132,7 +132,7 @@ fn expand_string(string: String, environment: &Environment) -> Value {
             let reference_name = &string[lpos+2..rpos].trim();
             if lpos == 0 && rpos == (string.len()-2) {
                 return lookup(reference_name, environment)
-            } else {
+            } else if reference_name.find("(").is_none() {  // avoid being tripped up by regexes :grimace:
                 let val = lookup(reference_name, environment);
                 let str_val = match val {
                     Value::Number(n) => format!("{}", n),
