@@ -1,8 +1,9 @@
 use std::fs::File;
 use std::io;
 use std::io::Write;
+use std::iter::Map;
 use std::path::PathBuf;
-use serde_yaml::{Mapping, Value};
+use serde_yaml::{Mapping, Sequence, Value};
 use crate::variable_definitions::{Mutation, MutationAction, VariableSource};
 
 pub(crate) enum Format {
@@ -16,28 +17,67 @@ pub(crate) struct Template {
     pub(crate) source_path: PathBuf,
 }
 
-fn navigate_mapping<'a>(mapping: &'a mut Mapping, path: &[String]) -> &'a mut Mapping {
-    if path.len() == 0 {
-        return mapping
+fn mapping_value(val: &mut Value) -> Option<&mut Mapping> {
+    if let Value::Mapping(ref mut m) = val {
+        return Some(m)
     }
-    let next = mapping.get_mut(path.get(0).expect("WTF")).expect("WTF");
-    if let Value::Mapping(ref mut m) = next {
-        return navigate_mapping(m, &path[1..])
+    return None
+}
+fn sequence_value(val: &mut Value) -> Option<&mut Sequence> {
+    if let Value::Sequence(ref mut s) = val {
+        return Some(s)
     }
-    panic!()
+    return None
+}
+
+trait Navigate {
+    fn navigate(&mut self, path: &[String]) -> &mut Value;
+}
+impl Navigate for Mapping {
+    fn navigate(&mut self, path: &[String]) -> &mut Value {
+        let next = self.get_mut(path.get(0).expect("WTF")).expect("WTF");
+        return next.navigate(&path[1..])
+    }
+}
+impl Navigate for Value {
+    fn navigate(&mut self, path: &[String]) -> &mut Value {
+        if path.len() == 0 {
+            return self
+        }
+        mapping_value(self).expect("not a mapping").navigate(path)
+    }
 }
 
 fn apply_mutation(mutation: &MutationAction, content: &mut Mapping){
     match mutation {
-        MutationAction::Add(path, Value::Mapping(new_entries)) => {}
-        MutationAction::Add(path, Value::Sequence(new_elems)) => {}
+        MutationAction::Add(path, Value::Mapping(new_entries)) => {
+            let current = mapping_value(content.navigate(&path)).expect("urm");
+            for (k, v) in new_entries.iter() {
+                let old_val = current.insert(k.clone(), v.clone());
+                if old_val.is_some() { panic!("Already had value at {:?}", path) }
+            }
+        }
+        MutationAction::Add(path, Value::Sequence(new_elems)) => {
+            let current = sequence_value(content.navigate(&path)).expect("urm");
+            for v in new_elems.iter() {
+                current.push(v.clone());
+            }
+        }
         MutationAction::Add(path, _) => { panic!("Add mutation is trying to add non-mapping, non-sequence values") }
         MutationAction::Remove(path) => {
-            navigate_mapping(content, &path[..(path.len()-1)])
+            mapping_value(content.navigate(&path[..(path.len()-1)]))
+                .expect("not a mapping")
                 .remove(&path[path.len()-1])
                 .expect(&format!("can't remove missing {:?}", &path));
         }
-        MutationAction::Replace(path, v) => {}
+        MutationAction::Replace(path, v) => {
+            let current = mapping_value(content.navigate(&path[..(path.len()-1)]))
+                .expect("not a mapping");
+            let old_val = current.insert(Value::String(path[path.len()-1].to_string()), v.clone());
+            if old_val.is_none() {
+                panic!("Value to replace at {:?} did not exist", &path)
+            }
+        }
     }
 }
 
