@@ -160,7 +160,10 @@ pub(crate) fn process(template: &Template, environment: &Environment, destinatio
             let content: Value = serde_yaml::from_reader(File::open(&template.source_path)?).unwrap();
             process_yaml(content, template.filename.to_string_lossy().to_string(), environment, destination)?;
         }
-        Format::Text => { panic!("Aaagh! This isn't YAML!") }
+        Format::Text => {
+            //panic!("Aaagh! This isn't YAML!")
+                // TODO do something proper
+        }
     }
     Ok(())
 }
