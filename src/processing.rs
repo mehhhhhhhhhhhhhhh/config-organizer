@@ -118,7 +118,7 @@ fn lookup(reference_name: &str, environment: &Environment) -> Value {
             if should_be_runtime_value {
                 eprintln!("WARN: Runtime value \"{}\" was unexpectedly hardcoded.", reference_name)
             }
-            val
+            expand(val, environment)
         }
     }
 }
