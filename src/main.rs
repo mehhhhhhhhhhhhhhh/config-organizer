@@ -17,6 +17,7 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use clap::Parser;
+use serde_yaml::Value;
 use crate::processing::Environment;
 
 #[derive(Parser)]
@@ -91,12 +92,13 @@ fn main() -> io::Result<()> {
             //println!("      {:?}", shit);
         }
 
-        let combined_source : VariableSource = variable_definitions::combine(var_sources.iter().map(|x| x.deref()).collect());
+        let mut combined_source : VariableSource = variable_definitions::combine(var_sources.iter().map(|x| x.deref()).collect());
         //eprintln!("{:?}", &combined_source.mutations.iter().map(|m| &m.filename_pattern).collect::<Vec<_>>());
 
         // for (k,v) in &combined_source.definitions {
         //     println!("{}: {:?}", &k, &v)
         // }
+        combined_source.definitions.insert("environment/name".to_string(), Value::String(name.clone()));
         let environment = Environment {
             definitions: combined_source,
             expected_runtime_lookup_prefixes: def.configuration.external_namespaces.iter().map(|ns| ns.to_string()+"/").collect(),
