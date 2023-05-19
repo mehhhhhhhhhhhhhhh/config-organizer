@@ -16,12 +16,12 @@ pub(crate) struct Template {
     pub(crate) source_path: PathBuf,
 }
 
-fn navigate_mapping<'a>(mapping: &'a Mapping, path: &[String]) -> &'a Mapping {
+fn navigate_mapping<'a>(mapping: &'a mut Mapping, path: &[String]) -> &'a mut Mapping {
     if path.len() == 0 {
-        return &mapping
+        return mapping
     }
-    let next = mapping.get(path.get(0).expect("WTF")).expect("WTF");
-    if let Value::Mapping(m) = next {
+    let next = mapping.get_mut(path.get(0).expect("WTF")).expect("WTF");
+    if let Value::Mapping(ref mut m) = next {
         return navigate_mapping(m, &path[1..])
     }
     panic!()
@@ -32,7 +32,11 @@ fn apply_mutation(mutation: &MutationAction, content: &mut Mapping){
         MutationAction::Add(path, Value::Mapping(new_entries)) => {}
         MutationAction::Add(path, Value::Sequence(new_elems)) => {}
         MutationAction::Add(path, _) => { panic!("Add mutation is trying to add non-mapping, non-sequence values") }
-        MutationAction::Remove(path) => {}
+        MutationAction::Remove(path) => {
+            navigate_mapping(content, &path[..(path.len()-1)])
+                .remove(&path[path.len()-1])
+                .expect(&format!("can't remove missing {:?}", &path));
+        }
         MutationAction::Replace(path, v) => {}
     }
 }
