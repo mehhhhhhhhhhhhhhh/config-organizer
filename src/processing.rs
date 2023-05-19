@@ -4,18 +4,20 @@ use std::io::Write;
 use std::iter::Map;
 use std::path::PathBuf;
 use serde_yaml::{Mapping, Sequence, Value};
-use crate::variable_definitions::{Mutation, MutationAction, VariableSource};
+use crate::variable_definitions::{Mutation, MutationAction, string_value, VariableSource};
 
+#[derive(Debug)]
 pub(crate) enum Format {
     Yaml, Text
 }
 // TODO support working in YAML but with Canonical JSON (RFC) output
-
+#[derive(Debug)]
 pub(crate) struct Environment {
     pub(crate) definitions: VariableSource,
     pub(crate) expected_runtime_lookup_prefixes: Vec<String>,
 }
 
+#[derive(Debug)]
 pub(crate) struct Template {
     pub(crate) filename: PathBuf,
     pub(crate) format: Format,
@@ -142,7 +144,12 @@ fn expand(mut content: Value, environment: &Environment) -> Value {
         Value::Number(a) => Value::Number(a),
         Value::String(str) => expand_string(str, environment),
         Value::Sequence(seq) => Value::Sequence(seq.into_iter().map(|v| expand(v, environment)).collect()),
-        Value::Mapping(map) => Value::Mapping(map.into_iter().map(|(k,v)| (k, expand(v, environment))).collect()),
+        Value::Mapping(map) => {
+            let mut stuff = map.into_iter().collect::<Vec<_>>();
+            stuff.sort_by_key(|(k,v)| string_value(k));
+            let stuff = stuff.into_iter().map(|(k,v)| (k, expand(v, environment))).collect();
+            Value::Mapping(stuff)
+        },
         Value::Tagged(_) => { panic!("what the fuck is this?") }
     }
 }

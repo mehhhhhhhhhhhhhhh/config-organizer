@@ -38,7 +38,7 @@ fn parse_defs(input: Mapping) -> io::Result<HashMap<String, Value>> {
     Ok(map)
 }
 
-fn string_value(input: &Value) -> Option<String> {
+pub(crate) fn string_value(input: &Value) -> Option<String> {
     if let Value::String(val) = input {
         Some(val.to_string())
     } else {
