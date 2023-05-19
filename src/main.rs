@@ -1,3 +1,5 @@
+#![feature(let_chains)]
+
 mod environment_definitions;
 mod variable_definitions;
 mod processing;
@@ -14,6 +16,7 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use clap::Parser;
+use crate::processing::Environment;
 
 #[derive(Parser)]
 struct Args {
@@ -75,8 +78,16 @@ fn main() -> io::Result<()> {
         let combined_source : VariableSource = variable_definitions::combine(var_sources.iter().map(|x| x.deref()).collect());
         //eprintln!("{:?}", &combined_source.mutations.iter().map(|m| &m.filename_pattern).collect::<Vec<_>>());
 
+        // for (k,v) in &combined_source.definitions {
+        //     println!("{}: {:?}", &k, &v)
+        // }
+        let environment = Environment {
+            definitions: combined_source,
+            expected_runtime_lookup_prefixes: def.configuration.external_namespaces.iter().map(|ns| ns.to_string()+"/").collect(),
+        };
+
         for template in get_templates() {
-            processing::process(&template, &combined_source, &mut File::create(output_dir.join(&template.filename))?)?;
+            processing::process(&template, &environment, &mut File::create(output_dir.join(&template.filename))?)?;
         }
     }
     Ok(())

@@ -17,4 +17,6 @@ pub(crate) struct EnvDef {
 #[derive(Deserialize, Debug)]
 pub(crate) struct ConfDef {
     pub variables: Vec<String>,
+    #[serde(default)]
+    pub external_namespaces: Vec<String>,
 }

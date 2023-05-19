@@ -11,6 +11,11 @@ pub(crate) enum Format {
 }
 // TODO support working in YAML but with Canonical JSON (RFC) output
 
+pub(crate) struct Environment {
+    pub(crate) definitions: VariableSource,
+    pub(crate) expected_runtime_lookup_prefixes: Vec<String>,
+}
+
 pub(crate) struct Template {
     pub(crate) filename: PathBuf,
     pub(crate) format: Format,
@@ -81,39 +86,85 @@ fn apply_mutation(mutation: &MutationAction, content: &mut Mapping){
     }
 }
 
-fn expand_string(string: String, source: &VariableSource) -> Value {
+fn _lookup(reference_name: &str, environment: &Environment) -> Option<Value> {
+    let maybe = environment.definitions.definitions.get(reference_name);
+    match maybe {
+        None => {
+            let last_slash = reference_name[..reference_name.len()-2].rfind("/");
+            match last_slash {
+                None => None,
+                Some(split_pos) => {
+                    _lookup(&(reference_name[..split_pos].to_string() + "/*"), environment)
+                },
+            }
+        },
+        Some(value) => Some(value.clone())
+    }
+}
+fn lookup(reference_name: &str, environment: &Environment) -> Value {
+    let should_be_runtime_value = environment.expected_runtime_lookup_prefixes.iter().any(|prefix| reference_name.starts_with(prefix));
+
+    match _lookup(reference_name, environment) {
+        None => {
+            if should_be_runtime_value {
+                Value::String("(( ".to_owned() + reference_name + " ))")
+            } else {
+                panic!("Couldn't find definition for {}", &reference_name)
+            }
+        }
+        Some(val) => {
+            if should_be_runtime_value {
+                eprintln!("WARN: Runtime value \"{}\" was unexpectedly hardcoded.", reference_name)
+            }
+            val
+        }
+    }
+}
+
+
+fn expand_string(string: String, environment: &Environment) -> Value {
+    let lpos = string.find("((");
+    let rpos = string.rfind("))");
+    if let Some(lpos) = lpos {
+        if let Some(rpos) = rpos {
+            let reference_name = &string[lpos+2..rpos].trim();
+            if lpos == 0 && rpos == (string.len()-2) {
+                return lookup(reference_name, environment)
+            }
+        }
+    }
     Value::String(string)
 }
-fn expand(mut content: Value, source: &VariableSource) -> Value {
+fn expand(mut content: Value, environment: &Environment) -> Value {
     match content {
         Value::Null => Value::Null,
         Value::Bool(a) => Value::Bool(a),
         Value::Number(a) => Value::Number(a),
-        Value::String(str) => expand_string(str, source),
-        Value::Sequence(seq) => Value::Sequence(seq.into_iter().map(|v| expand(v, source)).collect()),
-        Value::Mapping(map) => Value::Mapping(map.into_iter().map(|(k,v)| (k, expand(v, source))).collect()),
+        Value::String(str) => expand_string(str, environment),
+        Value::Sequence(seq) => Value::Sequence(seq.into_iter().map(|v| expand(v, environment)).collect()),
+        Value::Mapping(map) => Value::Mapping(map.into_iter().map(|(k,v)| (k, expand(v, environment))).collect()),
         Value::Tagged(_) => { panic!("what the fuck is this?") }
     }
 }
 
-pub(crate) fn process(template: &Template, source: &VariableSource, destination: &mut dyn Write) -> io::Result<()> {
+pub(crate) fn process(template: &Template, environment: &Environment, destination: &mut dyn Write) -> io::Result<()> {
     match template.format {
         Format::Yaml => {
             let content: Value = serde_yaml::from_reader(File::open(&template.source_path)?).unwrap();
-            process_yaml(content, template.filename.to_string_lossy().to_string(), source, destination)?;
+            process_yaml(content, template.filename.to_string_lossy().to_string(), environment, destination)?;
         }
         Format::Text => { panic!("Aaagh! This isn't YAML!") }
     }
     Ok(())
 }
 
-pub(crate) fn process_yaml(mut content: Value, filename: String, source: &VariableSource, destination: &mut dyn Write) -> io::Result<()> {
-    for mutation in &source.mutations {
+fn process_yaml(mut content: Value, filename: String, environment: &Environment, destination: &mut dyn Write) -> io::Result<()> {
+    for mutation in &environment.definitions.mutations {
         if mutation.filename_pattern == filename {
             apply_mutation(&mutation.action, mapping_value(&mut content).expect("not a mapping"));
         }
     }
-    let content = expand(content, source);
+    let content = expand(content, environment);
     serde_yaml::to_writer(destination, &content);  // TODO handle errors
     Ok(())
 }
