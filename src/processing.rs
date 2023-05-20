@@ -1,4 +1,4 @@
-use std::fs::File;
+use std::fs::{File, read_to_string, write};
 use std::io;
 use std::io::Write;
 use std::iter::Map;
@@ -105,6 +105,7 @@ fn _lookup(reference_name: &str, environment: &Environment) -> Option<Value> {
 }
 fn lookup(reference_name: &str, environment: &Environment) -> Option<Value> {
     let should_be_runtime_value = environment.expected_runtime_lookup_prefixes.iter().any(|prefix| reference_name.starts_with(prefix));
+    let should_be_json = reference_name.ends_with("/json");
 
     match _lookup(reference_name, environment) {
         None => {
@@ -118,11 +119,21 @@ fn lookup(reference_name: &str, environment: &Environment) -> Option<Value> {
             if should_be_runtime_value {
                 eprintln!("WARN: Runtime value \"{}\" was unexpectedly hardcoded.", reference_name)
             }
-            Some(expand(val, environment))
+            if should_be_json {
+                let expanded_val = expand(val, environment);
+                if let Value::Mapping(m) = expanded_val {
+                    Some(Value::String(format!("{:?}", m)))  // TODO make this actual json
+                } else if let Value::String(s) = expanded_val {
+                    Some(Value::String(s))
+                } else {
+                    panic!("Received non-mapping value for /json conversion: {:?}", &expanded_val)
+                }
+            } else {
+                Some(expand(val, environment))
+            }
         }
     }
 }
-
 
 fn expand_string(string: String, environment: &Environment) -> Value {
     let lpos = string.find("((");
@@ -170,8 +181,9 @@ pub(crate) fn process(template: &Template, environment: &Environment, destinatio
             process_yaml(content, template.filename.to_string_lossy().to_string(), environment, destination)?;
         }
         Format::Text => {
-            //panic!("Aaagh! This isn't YAML!")
-                // TODO do something proper
+            let text = read_to_string(&template.source_path)?;
+            let processed = string_value(&expand_string(text, environment)).expect("Text template somehow expanded to a non-string value");
+            destination.write(processed.as_bytes())?;
         }
     }
     Ok(())
