@@ -80,6 +80,7 @@ fn main() -> io::Result<()> {
         //println!("{}:\n  {:?}", &name, &def);
 
         let output_dir = Path::new(&format!("envs2/{}/configs", &name)).to_path_buf();
+        println!("Writing config to {:?}...", output_dir);
         fs::create_dir_all(&output_dir)?;
         //println!("    {:?}", &output_dir);
 
