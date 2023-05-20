@@ -103,13 +103,13 @@ fn _lookup(reference_name: &str, environment: &Environment) -> Option<Value> {
         Some(value) => Some(value.clone())
     }
 }
-fn lookup(reference_name: &str, environment: &Environment) -> Value {
+fn lookup(reference_name: &str, environment: &Environment) -> Option<Value> {
     let should_be_runtime_value = environment.expected_runtime_lookup_prefixes.iter().any(|prefix| reference_name.starts_with(prefix));
 
     match _lookup(reference_name, environment) {
         None => {
             if should_be_runtime_value {
-                Value::String("(( ".to_owned() + reference_name + " ))")
+                None
             } else {
                 panic!("Couldn't find definition for {}", &reference_name)
             }
@@ -118,7 +118,7 @@ fn lookup(reference_name: &str, environment: &Environment) -> Value {
             if should_be_runtime_value {
                 eprintln!("WARN: Runtime value \"{}\" was unexpectedly hardcoded.", reference_name)
             }
-            expand(val, environment)
+            Some(expand(val, environment))
         }
     }
 }
@@ -131,13 +131,14 @@ fn expand_string(string: String, environment: &Environment) -> Value {
         if let Some(rpos) = rpos {
             let reference_name = &string[lpos+2..rpos].trim();
             if lpos == 0 && rpos == (string.len()-2) {
-                return lookup(reference_name, environment)
+                return lookup(reference_name, environment).unwrap_or(Value::String(string))
             } else if reference_name.find("(").is_none() {  // avoid being tripped up by regexes :grimace:
                 let val = lookup(reference_name, environment);
                 let str_val = match val {
-                    Value::Number(n) => format!("{}", n),
-                    Value::String(str) => str,
-                    val => panic!("Attempted to interpolate non-string value \"{}\" ({:?})", reference_name, val),
+                    None => {return Value::String(string)},
+                    Some(Value::Number(n)) => format!("{}", n),
+                    Some(Value::String(str)) => str,
+                    Some(val) => panic!("Attempted to interpolate non-string value \"{}\" ({:?})", reference_name, val),
                 };
                 return expand_string(string[..lpos].to_string() + &str_val + &string[rpos+2..], environment)
             }
