@@ -1,5 +1,3 @@
-#![feature(let_chains)]
-
 mod environment_definitions;
 mod variable_definitions;
 mod processing;
