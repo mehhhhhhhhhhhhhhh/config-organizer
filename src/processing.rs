@@ -3,6 +3,7 @@ use std::io;
 use std::io::Write;
 use std::iter::Map;
 use std::path::PathBuf;
+use serde::Serialize;
 use serde_yaml::{Mapping, Sequence, Value};
 use crate::variable_definitions::{Mutation, MutationAction, string_value, VariableSource};
 
@@ -196,6 +197,16 @@ fn process_yaml(mut content: Value, filename: String, environment: &Environment,
         }
     }
     let content = expand(content, environment);
-    serde_yaml::to_writer(destination, &content);  // TODO handle errors
+
+    // normal yaml
+    //serde_yaml::to_writer(destination, &content);  // TODO handle errors
+
+    // OLPC bullshit canonical json -- not usable by us as floating point numbers are not allowed
+    // let mut ser = serde_json::Serializer::with_formatter(destination, serde_canonical_json::CanonicalFormatter::new());
+    // content.serialize(&mut ser).unwrap();
+
+    // RFC 8785 canonical json
+    destination.write(canonical_json::to_string(&serde_json::to_value(content).unwrap()).unwrap().as_bytes())?;
+
     Ok(())
 }
