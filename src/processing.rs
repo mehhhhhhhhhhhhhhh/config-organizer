@@ -56,6 +56,24 @@ impl Navigate for Value {
     }
 }
 
+trait TryNavigate {
+    fn try_navigate(&mut self, path: &[String]) -> Option<&mut Value>;
+}
+impl TryNavigate for Mapping {
+    fn try_navigate(&mut self, path: &[String]) -> Option<&mut Value> {
+        let next = self.get_mut(path.get(0).expect(&format!("WTF, regarding path {:?}", &path)));
+        return next.and_then(|next| next.try_navigate(&path[1..]))
+    }
+}
+impl TryNavigate for Value {
+    fn try_navigate(&mut self, path: &[String]) -> Option<&mut Value> {
+        if path.len() == 0 {
+            return Some(self)
+        }
+        mapping_value(self).expect("not a mapping").try_navigate(path)
+    }
+}
+
 fn apply_mutation(mutation: &MutationAction, content: &mut Value){
     match mutation {
         MutationAction::Add(path, Value::Mapping(new_entries)) => {
@@ -196,7 +214,8 @@ fn process_yaml(mut content: Value, filename: String, environment: &Environment,
             apply_mutation(&mutation.action, &mut content);
         }
     }
-    let content = expand(content, environment);
+    let mut content = expand(content, environment);
+    postprocess_yaml(&mut content);
 
     // normal yaml
     //serde_yaml::to_writer(destination, &content);  // TODO handle errors
@@ -209,4 +228,21 @@ fn process_yaml(mut content: Value, filename: String, environment: &Environment,
     destination.write((canonical_json::to_string(&serde_json::to_value(content).unwrap()).unwrap() + "\n").as_bytes())?;
 
     Ok(())
+}
+
+fn postprocess_yaml(mut yaml_config: &mut Value) {
+    if let Some(profiles) = yaml_config.try_navigate(&vec!["spring".to_string(), "profiles".to_string()]) {
+        if let Value::Mapping(profiles) = profiles {
+            if let Some(Value::Sequence(active_profiles)) = profiles.get("active") {
+                profiles.insert(
+                    Value::String("active".to_string()),
+                    Value::String(
+                        active_profiles.iter().map(|prof| {
+                            string_value(prof).unwrap()
+                        }).collect::<Vec<_>>().join(",")
+                    )
+                );
+            }
+        }
+    }
 }
