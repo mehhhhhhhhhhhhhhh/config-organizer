@@ -225,7 +225,7 @@ fn process_yaml(mut content: Value, filename: String, environment: &Environment,
     // content.serialize(&mut ser).unwrap();
 
     // RFC 8785 canonical json
-    destination.write((canonical_json::to_string(&serde_json::to_value(content).unwrap()).unwrap() + "\n").as_bytes())?;
+    destination.write_all((canonical_json::to_string(&serde_json::to_value(content).unwrap()).unwrap() + "\n").as_bytes())?;
 
     Ok(())
 }
