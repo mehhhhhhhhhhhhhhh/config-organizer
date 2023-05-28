@@ -94,9 +94,11 @@ fn main() -> io::Result<()> {
     for (name, def) in envs {
         //println!("{}:\n  {:?}", &name, &def);
 
-        let output_dir = Path::new(&format!("envs2/{}/configs", &name)).to_path_buf();
-        println!("Writing config to {:?}...", output_dir);
-        fs::create_dir_all(&output_dir)?;
+        let main_output_dir = Path::new(&format!("envs2/{}/configs", &name)).to_path_buf();
+        let canonical_output_dir = Path::new(&format!("envs2c/{}/configs", &name)).to_path_buf();
+        println!("Writing config to {:?} and {:?}...", main_output_dir, canonical_output_dir);
+        fs::create_dir_all(&main_output_dir)?;
+        fs::create_dir_all(&canonical_output_dir)?;
         //println!("    {:?}", &output_dir);
 
         let mut var_sources : Vec<Rc<VariableSource>> = vec![];
@@ -121,16 +123,19 @@ fn main() -> io::Result<()> {
         };
 
         for template in get_templates() {
-            let output_path = output_dir.join(&template.source_path.file_name().unwrap().to_str().unwrap());
+            let main_output_path = main_output_dir.join(&template.source_path.file_name().unwrap().to_str().unwrap());
+            let canonical_output_path = canonical_output_dir.join(&template.source_path.file_name().unwrap().to_str().unwrap());
 
             match (template.format) {
                 TemplateFormat::Yaml => {
                     let result = processing::process_yaml(&template, &environment);
-                    write_full_yaml(&result, output_path.as_path())?;
+                    write_full_yaml(&result, main_output_path.as_path())?;
+                    write_canonical_json(&result, canonical_output_path.as_path())?;
                 }
                 TemplateFormat::Text => {
                     let result = processing::process_text(&template, &environment);
-                    write_text(&result, output_path.as_path())?;
+                    write_text(&result, main_output_path.as_path())?;
+                    write_text(&result, canonical_output_path.as_path())?;
                 }
             }
         }
