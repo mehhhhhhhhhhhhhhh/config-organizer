@@ -170,7 +170,7 @@ fn expand_string(string: String, environment: &Environment) -> Value {
                     Some(Value::String(str)) => str,
                     Some(val) => panic!("Attempted to interpolate non-string value \"{}\" ({:?})", reference_name, val),
                 };
-                return expand_string(string[..lpos].to_string() + &str_val + &string[rpos+2..], environment)
+                return expand_string(string[..lpos].to_string() + &str_val + &string_value(&expand_string(string[rpos+2..].to_string(), environment)).unwrap(), environment)
             }
         }
     }
