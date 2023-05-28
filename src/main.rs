@@ -3,7 +3,7 @@ mod variable_definitions;
 mod processing;
 
 use environment_definitions::EnvironmentDefinitions;
-use processing::{Template, Format};
+use processing::{Template, TemplateFormat};
 use variable_definitions::VariableSource;
 
 use std::{env, fs, io};
@@ -11,6 +11,7 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 use std::fs::{File, read_dir};
+use std::io::Write;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -39,12 +40,12 @@ impl VarDefParseCache {
     }
 }
 
-fn determine_format(filename: &OsString) -> Format {
+fn determine_format(filename: &OsString) -> TemplateFormat {
     let as_str = filename.to_string_lossy();
     if as_str.ends_with(".yml") {
-        Format::Yaml
+        TemplateFormat::Yaml
     } else if vec![".conf", ".env", ".txt", ".php"].iter().any(|ext| as_str.ends_with(ext)) {
-        Format::Text
+        TemplateFormat::Text
     } else {
         panic!("Couldn't determine processing format for filename \"{}\"", as_str)
     }
@@ -57,11 +58,27 @@ fn get_templates() -> Vec<Template> {
         let filename = template_dir_entry.file_name();
         let format = determine_format(&filename);
         Template {
-            filename: filename.into(),
             format: format,
             source_path: template_dir_entry.path(),
         }
     }).collect();
+}
+
+fn write_text(content: &str, output_path: &Path) -> io::Result<()> {
+    let mut output_file = File::create(output_path)?;
+    output_file.write_all(content.as_bytes())
+}
+
+fn write_full_yaml(content: &Value, output_path: &Path) -> io::Result<()> {
+    let mut output_file = File::create(output_path)?;
+    serde_yaml::to_writer(output_file, content).map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))
+}
+
+fn write_canonical_json(content: &Value, output_path: &Path) -> io::Result<()> {
+    // Note: this is RFC 8785 canonical json -- not the weird OLPC bullshit, which we can't use as it forbids floats.
+    let mut output_file = File::create(output_path)?;
+    let canonical_json = canonical_json::to_string(&serde_json::to_value(content).expect("JSON conversion error")).expect("Canonical JSON error");
+    output_file.write_all((canonical_json + "\n").as_bytes())
 }
 
 fn main() -> io::Result<()> {
@@ -104,7 +121,18 @@ fn main() -> io::Result<()> {
         };
 
         for template in get_templates() {
-            processing::process(&template, &environment, &mut File::create(output_dir.join(&template.filename))?)?;
+            let output_path = output_dir.join(&template.source_path.file_name().unwrap().to_str().unwrap());
+
+            match (template.format) {
+                TemplateFormat::Yaml => {
+                    let result = processing::process_yaml(&template, &environment);
+                    write_full_yaml(&result, output_path.as_path())?;
+                }
+                TemplateFormat::Text => {
+                    let result = processing::process_text(&template, &environment);
+                    write_text(&result, output_path.as_path())?;
+                }
+            }
         }
     }
     Ok(())
