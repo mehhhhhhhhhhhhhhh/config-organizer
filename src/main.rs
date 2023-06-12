@@ -77,7 +77,7 @@ fn write_full_yaml(content: &Value, output_path: &Path) -> io::Result<()> {
 fn write_canonical_json(content: &Value, output_path: &Path) -> io::Result<()> {
     // Note: this is RFC 8785 canonical json -- not the weird OLPC bullshit, which we can't use as it forbids floats.
     let mut output_file = File::create(output_path)?;
-    let canonical_json = canonical_json::to_string(&serde_json::to_value(content).expect("JSON conversion error")).expect("Canonical JSON error");
+    let canonical_json = json_canon::to_string(&serde_json::to_value(content).expect("JSON conversion error")).expect("Canonical JSON error");
     output_file.write_all((canonical_json + "\n").as_bytes())
 }
 

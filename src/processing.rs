@@ -141,7 +141,7 @@ fn lookup(reference_name: &str, environment: &Environment) -> Option<Value> {
             if should_be_json {
                 let expanded_val = expand(val, environment);
                 if let Value::Mapping(m) = expanded_val {
-                    Some(Value::String(canonical_json::to_string(&serde_json::to_value(m).unwrap()).unwrap()))
+                    Some(Value::String(json_canon::to_string(&serde_json::to_value(m).unwrap()).unwrap()))
                 } else if let Value::String(s) = expanded_val {
                     Some(Value::String(s))
                 } else {
