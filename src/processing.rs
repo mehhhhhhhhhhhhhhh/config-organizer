@@ -249,7 +249,7 @@ fn postprocess_yaml(mut yaml_config: &mut Value) {
                     Value::String(
                         active_profiles.iter().map(|prof| {
                             string_value(prof).unwrap()
-                        }).collect::<Vec<_>>().join(",")
+                        }).collect::<Vec<_>>().join(", ")
                     )
                 );
             }
