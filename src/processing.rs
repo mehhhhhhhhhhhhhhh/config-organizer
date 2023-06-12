@@ -1,8 +1,11 @@
+use std::borrow::Cow;
 use std::fs::{File, read_to_string, write};
 use std::io;
 use std::io::Write;
 use std::iter::Map;
 use std::path::PathBuf;
+use lazy_static::lazy_static;
+use regex::{Captures, Regex};
 use serde::Serialize;
 use serde_yaml::{Mapping, Sequence, Value};
 use crate::variable_definitions::{Mutation, MutationAction, string_value, VariableSource};
@@ -154,28 +157,53 @@ fn lookup(reference_name: &str, environment: &Environment) -> Option<Value> {
     }
 }
 
-fn expand_string(string: String, environment: &Environment) -> Value {
-    let lpos = string.find("((");
-    let rpos = string.find("))");
-    if let Some(lpos) = lpos {
-        if let Some(rpos) = rpos {
-            let reference_name = &string[lpos+2..rpos].trim();
-            if lpos == 0 && rpos == (string.len()-2) {
-                return lookup(reference_name, environment).unwrap_or(Value::String(string))
-            } else if reference_name.find("(").is_none() {  // avoid being tripped up by regexes :grimace:
-                let val = lookup(reference_name, environment);
-                let str_val = match val {
-                    None => {return Value::String(string)},
-                    Some(Value::Number(n)) => format!("{}", n),
-                    Some(Value::String(str)) => str,
-                    Some(val) => panic!("Attempted to interpolate non-string value \"{}\" ({:?})", reference_name, val),
-                };
-                return expand_string(string[..lpos].to_string() + &str_val + &string_value(&expand_string(string[rpos+2..].to_string(), environment)).unwrap(), environment)
-            }
-        }
-    }
-    Value::String(string)
+
+lazy_static! {
+    static ref VAR_SUBSTITUTION_PATTERN: Regex = Regex::new(r"\(\(\s*([^) ]*?)\s*\)\)").unwrap();
+    static ref FULL_MATCH_PATTERN: Regex = Regex::new(r"\A\s*\(\(\s*([^) ]*?)\s*\)\)\s*\z").unwrap();
 }
+
+fn expand_string(string: String, environment: &Environment) -> Value {
+    if let Some(captures) = FULL_MATCH_PATTERN.captures(&string) {
+        let ref_name = captures.get(1).unwrap().as_str();
+        return lookup(ref_name, environment).unwrap_or(Value::String(string));
+    }
+    let substituted = VAR_SUBSTITUTION_PATTERN.replace_all(&string, |captures: &Captures| {
+        let ref_name = captures.get(1).unwrap().as_str();
+        let val = lookup(ref_name, environment);
+        match val {
+            None => format!("(( {} ))", ref_name),
+            Some(Value::Number(n)) => format!("{}", n),
+            Some(Value::String(str)) => str,
+            Some(_) => panic!("Attempted to interpolate non-string value \"{}\" ({:?})", ref_name, val),
+        }
+    });
+    Value::String(substituted.to_string())
+}
+
+// fn expand_string(string: String, environment: &Environment) -> Value {
+//     let lpos = string.find("((");
+//     let rpos = string.find("))");
+//     if let Some(lpos) = lpos {
+//         if let Some(rpos) = rpos {
+//             let reference_name = &string[lpos+2..rpos].trim();
+//             if lpos == 0 && rpos == (string.len()-2) {
+//                 return lookup(reference_name, environment).unwrap_or(Value::String(string))
+//             } else if reference_name.find("(").is_none() {  // avoid being tripped up by regexes :grimace:
+//                 let val = lookup(reference_name, environment);
+//                 let str_val = match val {
+//                     None => {return Value::String(string)},
+//                     Some(Value::Number(n)) => format!("{}", n),
+//                     Some(Value::String(str)) => str,
+//                     Some(val) => panic!("Attempted to interpolate non-string value \"{}\" ({:?})", reference_name, val),
+//                 };
+//                 return expand_string(string[..lpos].to_string() + &str_val + &string_value(&expand_string(string[rpos+2..].to_string(), environment)).unwrap(), environment)
+//             }
+//         }
+//     }
+//     Value::String(string)
+// }
+
 fn expand(mut content: Value, environment: &Environment) -> Value {
     match content {
         Value::Null => Value::Null,
