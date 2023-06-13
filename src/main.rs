@@ -123,7 +123,12 @@ fn main() -> io::Result<()> {
         };
 
         for template in get_templates() {
-            let main_output_path = main_output_dir.join(&template.source_path.file_name().unwrap().to_str().unwrap());
+            let filename = template.source_path.file_name().unwrap().to_str().unwrap();
+            if def.configuration.excluded_files.iter().any(|ex_fn| ex_fn==filename) {
+                eprintln!("Skipping {}", &filename);
+                continue
+            }
+            let main_output_path = main_output_dir.join(&filename);
             let canonical_output_path = canonical_output_dir.join(&template.source_path.file_name().unwrap().to_str().unwrap());
 
             match (template.format) {
