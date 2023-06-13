@@ -212,7 +212,7 @@ fn expand(mut content: Value, environment: &Environment) -> Value {
         Value::String(str) => expand_string(str, environment),
         Value::Sequence(seq) => Value::Sequence(seq.into_iter().map(|v| expand(v, environment)).collect()),
         Value::Mapping(map) => {
-            let mut stuff = map.into_iter().collect::<Vec<_>>();
+            let mut stuff = map.into_iter().map(|(k,v)| (expand(k, environment), v)).collect::<Vec<_>>();
             stuff.sort_by_key(|(k,v)| string_value(k));
             let stuff = stuff.into_iter().map(|(k,v)| (k, expand(v, environment))).collect();
             Value::Mapping(stuff)
