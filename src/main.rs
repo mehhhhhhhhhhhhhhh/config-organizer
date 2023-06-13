@@ -11,7 +11,7 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 use std::fs::{File, read_dir};
-use std::io::Write;
+use std::io::{read_to_string, Write};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -65,19 +65,39 @@ fn get_templates() -> Vec<Template> {
 }
 
 fn write_text(content: &str, output_path: &Path) -> io::Result<()> {
+    if let Some(true) = File::open(output_path).ok().and_then(|mut f|{
+        Some(read_to_string(f).ok()? == content)
+    }) {
+        eprintln!("File {:?} is unchanged", output_path);
+        return Ok(())
+    }
     let mut output_file = File::create(output_path)?;
     output_file.write_all(content.as_bytes())
 }
 
 fn write_full_yaml(content: &Value, output_path: &Path) -> io::Result<()> {
+    if let Some(true) = File::open(output_path).ok().and_then(|mut f|{
+        Some(read_to_string(f).ok()? == serde_yaml::to_string(content).expect("YAML error"))
+    }) {
+        eprintln!("File {:?} is unchanged", output_path);
+        return Ok(())
+    }
     let mut output_file = File::create(output_path)?;
     serde_yaml::to_writer(output_file, content).map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))
 }
 
 fn write_canonical_json(content: &Value, output_path: &Path) -> io::Result<()> {
+    let canonical_json = json_canon::to_string(&serde_json::to_value(content).expect("JSON conversion error")).expect("Canonical JSON error");
+
+    if let Some(true) = File::open(output_path).ok().and_then(|mut f|{
+        Some(read_to_string(f).ok()? == (canonical_json.clone() + "\n"))
+    }) {
+        eprintln!("File {:?} is unchanged", output_path);
+        return Ok(())
+    }
+
     // Note: this is RFC 8785 canonical json -- not the weird OLPC bullshit, which we can't use as it forbids floats.
     let mut output_file = File::create(output_path)?;
-    let canonical_json = json_canon::to_string(&serde_json::to_value(content).expect("JSON conversion error")).expect("Canonical JSON error");
     output_file.write_all((canonical_json + "\n").as_bytes())
 }
 
