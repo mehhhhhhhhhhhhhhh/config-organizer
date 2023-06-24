@@ -39,6 +39,8 @@ struct Args {
     #[deprecated]
     #[arg(value_enum, long = "format", default_value_t = OutputFormat::CanonicalJson)]
     format: OutputFormat,
+
+    // TODO control over verboseness
 }
 
 #[test]
