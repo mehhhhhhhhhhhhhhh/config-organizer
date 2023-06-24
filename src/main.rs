@@ -33,6 +33,9 @@ struct Args {
     input_directory: PathBuf,
     output_directory: PathBuf,
 
+    #[arg(long = "envs", default_value = default_envs_file().into_os_string())]
+    environments_file_path: PathBuf,
+
     #[deprecated]
     #[arg(value_enum, long = "format", default_value_t = OutputFormat::CanonicalJson)]
     format: OutputFormat,
@@ -40,6 +43,10 @@ struct Args {
 
 #[test]
 fn tests_tester() {}
+
+fn default_envs_file() -> PathBuf {
+    PathBuf::from_str("./environments.yml").unwrap()
+}
 
 struct VarDefParseCache {
     cache: HashMap<PathBuf, Rc<VariableSource>>,
@@ -84,9 +91,11 @@ fn write_text(content: &str, output_path: &Path) -> io::Result<()> {
     if let Some(true) = File::open(output_path).ok().and_then(|mut f|{
         Some(read_to_string(f).ok()? == content)
     }) {
-        eprintln!("File {:?} is unchanged", output_path);
+        eprintln!("Unchanged {:?}", output_path);
         return Ok(())
     }
+    eprintln!("Writing {:?}", output_path);
+
     let mut output_file = File::create(output_path)?;
     output_file.write_all(content.as_bytes())
 }
@@ -95,9 +104,11 @@ fn write_full_yaml(content: &Value, output_path: &Path) -> io::Result<()> {
     if let Some(true) = File::open(output_path).ok().and_then(|mut f|{
         Some(read_to_string(f).ok()? == serde_yaml::to_string(content).expect("YAML error"))
     }) {
-        eprintln!("File {:?} is unchanged", output_path);
+        eprintln!("Unchanged {:?}", output_path);
         return Ok(())
     }
+    eprintln!("Writing {:?}", output_path);
+
     let mut output_file = File::create(output_path)?;
     serde_yaml::to_writer(output_file, content).map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))
 }
@@ -108,9 +119,10 @@ fn write_canonical_json(content: &Value, output_path: &Path) -> io::Result<()> {
     if let Some(true) = File::open(output_path).ok().and_then(|mut f|{
         Some(read_to_string(f).ok()? == (canonical_json.clone() + "\n"))
     }) {
-        eprintln!("File {:?} is unchanged", output_path);
+        eprintln!("Unchanged {:?}", output_path);
         return Ok(())
     }
+    eprintln!("Writing {:?}", output_path);
 
     // Note: this is RFC 8785 canonical json -- not the weird OLPC bullshit, which we can't use as it forbids floats.
     let mut output_file = File::create(output_path)?;
@@ -121,7 +133,7 @@ fn main() -> io::Result<()> {
     let args = Args::parse();
     env::set_current_dir(args.input_directory)?;
 
-    let envs_file = File::open("environments.yml")?;
+    let envs_file = File::open(args.environments_file_path)?;
     let env_defs : EnvironmentDefinitions = serde_yaml::from_reader(envs_file).unwrap();
     let envs = env_defs.environments;
 
@@ -130,12 +142,9 @@ fn main() -> io::Result<()> {
     for (name, def) in envs {
         //println!("{}:\n  {:?}", &name, &def);
 
-        let main_output_dir = Path::new(&format!("envs2/{}/configs", &name)).to_path_buf();
-        let canonical_output_dir = Path::new(&format!("envs2c/{}/configs", &name)).to_path_buf();
-        println!("Writing config to {:?} and {:?}...", main_output_dir, canonical_output_dir);
-        fs::create_dir_all(&main_output_dir)?;
-        fs::create_dir_all(&canonical_output_dir)?;
-        //println!("    {:?}", &output_dir);
+        let mut output_dir = args.output_directory.to_path_buf();
+        output_dir.push(Path::new(&format!("{}/configs", &name)));
+        fs::create_dir_all(&output_dir)?;
 
         let mut var_sources : Vec<Rc<VariableSource>> = vec![];
         for var_source_path in def.configuration.variables {
@@ -164,8 +173,7 @@ fn main() -> io::Result<()> {
                 eprintln!("Skipping {}", &filename);
                 continue
             }
-            let main_output_path = main_output_dir.join(&filename);
-            let canonical_output_path = canonical_output_dir.join(&template.source_path.file_name().unwrap().to_str().unwrap());
+            let output_path = output_dir.join(&template.source_path.file_name().unwrap().to_str().unwrap()).as_path().to_owned();
 
             match (template.format) {
                 TemplateFormat::Yaml => {
@@ -174,11 +182,11 @@ fn main() -> io::Result<()> {
                         OutputFormat::CanonicalJson => write_canonical_json,
                         OutputFormat::Yaml => write_full_yaml,
                     };
-                    output_fn(&result, args.output_directory.as_path())?;
+                    output_fn(&result, &output_path)?;
                 }
                 TemplateFormat::Text => {
                     let result = processing::process_text(&template, &environment);
-                    write_text(&result, args.output_directory.as_path())?;
+                    write_text(&result, &output_path)?;
                 }
             }
         }
