@@ -1,4 +1,4 @@
-use std::any::Any;
+
 use std::collections::HashMap;
 use std::fs::File;
 use std::io;
@@ -57,10 +57,10 @@ fn _parse_value_path(nested_input: &Value) -> Option<Vec<String>> {
         let (key, more) = nested_input.iter().next()?;
         let key = string_value(key)?;
 
-        return _parse_value_path(more).map(|mut vec| {
+        _parse_value_path(more).map(|mut vec| {
             vec.push(key.clone());
             vec
-        });
+        })
     } else if let Value::Null = nested_input {
         return Some(vec![]);
     } else {
@@ -113,19 +113,19 @@ fn _parse_mutation(input: &Value) -> Option<Mutation> {
 fn parse_mutation(input: &Value) -> io::Result<Mutation> {
     _parse_mutation(input).ok_or(io::Error::new(
         io::ErrorKind::InvalidData,
-        format!("Dodgy mutation syntax: {:?}", input),
+        format!("Dodgy mutation syntax: {input:?}"),
     ))
 }
 
 fn remove_mutations(input: &mut Mapping) -> io::Result<Vec<Mutation>> {
     let mutations_val = input.remove("mutations");
-    if let None = mutations_val {
+    if mutations_val.is_none() {
         return Ok(vec![]);
     }
 
     if let Some(Value::Sequence(mutations_seq)) = mutations_val {
         let iter = mutations_seq.iter();
-        let map = iter.map(|m| parse_mutation(m));
+        let map = iter.map(parse_mutation);
         return map.collect::<io::Result<Vec<Mutation>>>();
     }
 
@@ -143,7 +143,7 @@ pub(crate) fn load(path: &Path) -> io::Result<VariableSource> {
 
     Ok(VariableSource {
         definitions: parse_defs(input)?,
-        mutations: mutations,
+        mutations,
     })
 }
 

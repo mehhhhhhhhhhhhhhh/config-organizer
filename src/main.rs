@@ -11,7 +11,7 @@ use clap::{Parser, ValueEnum};
 use serde_yaml::Value;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::ffi::{OsStr, OsString};
+use std::ffi::{OsString};
 use std::fs::{read_dir, File};
 use std::io::{read_to_string, Write};
 use std::ops::Deref;
@@ -82,8 +82,7 @@ fn determine_format(filename: &OsString) -> TemplateFormat {
         TemplateFormat::Text
     } else {
         panic!(
-            "Couldn't determine processing format for filename \"{}\"",
-            as_str
+            "Couldn't determine processing format for filename \"{as_str}\""
         )
     }
 }
@@ -91,44 +90,44 @@ fn determine_format(filename: &OsString) -> TemplateFormat {
 fn get_templates() -> Vec<Template> {
     let stuff =
         read_dir(PathBuf::from("configuration/templates")).expect("Failed to list templates");
-    return stuff
+    stuff
         .into_iter()
         .map(|template_listing| {
             let template_dir_entry = template_listing.expect("WTF");
             let filename = template_dir_entry.file_name();
             let format = determine_format(&filename);
             Template {
-                format: format,
+                format,
                 source_path: template_dir_entry.path(),
             }
         })
-        .collect();
+        .collect()
 }
 
 fn write_text(content: &str, output_path: &Path) -> io::Result<()> {
     if let Some(true) = File::open(output_path)
         .ok()
-        .and_then(|mut f| Some(read_to_string(f).ok()? == content))
+        .and_then(|f| Some(read_to_string(f).ok()? == content))
     {
-        eprintln!("Unchanged {:?}", output_path);
+        eprintln!("Unchanged {output_path:?}");
         return Ok(());
     }
-    eprintln!("Writing {:?}", output_path);
+    eprintln!("Writing {output_path:?}");
 
     let mut output_file = File::create(output_path)?;
     output_file.write_all(content.as_bytes())
 }
 
 fn write_full_yaml(content: &Value, output_path: &Path) -> io::Result<()> {
-    if let Some(true) = File::open(output_path).ok().and_then(|mut f| {
+    if let Some(true) = File::open(output_path).ok().and_then(|f| {
         Some(read_to_string(f).ok()? == serde_yaml::to_string(content).expect("YAML error"))
     }) {
-        eprintln!("Unchanged {:?}", output_path);
+        eprintln!("Unchanged {output_path:?}");
         return Ok(());
     }
-    eprintln!("Writing {:?}", output_path);
+    eprintln!("Writing {output_path:?}");
 
-    let mut output_file = File::create(output_path)?;
+    let output_file = File::create(output_path)?;
     serde_yaml::to_writer(output_file, content)
         .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))
 }
@@ -140,12 +139,12 @@ fn write_canonical_json(content: &Value, output_path: &Path) -> io::Result<()> {
 
     if let Some(true) = File::open(output_path)
         .ok()
-        .and_then(|mut f| Some(read_to_string(f).ok()? == (canonical_json.clone() + "\n")))
+        .and_then(|f| Some(read_to_string(f).ok()? == (canonical_json.clone() + "\n")))
     {
-        eprintln!("Unchanged {:?}", output_path);
+        eprintln!("Unchanged {output_path:?}");
         return Ok(());
     }
-    eprintln!("Writing {:?}", output_path);
+    eprintln!("Writing {output_path:?}");
 
     // Note: this is RFC 8785 canonical json -- not the weird OLPC bullshit, which we can't use as it forbids floats.
     let mut output_file = File::create(output_path)?;
@@ -212,14 +211,14 @@ fn main() -> io::Result<()> {
                 continue;
             }
             let output_path = output_dir
-                .join(&template.source_path.file_name().unwrap().to_str().unwrap())
+                .join(template.source_path.file_name().unwrap().to_str().unwrap())
                 .as_path()
                 .to_owned();
 
-            match (template.format) {
+            match template.format {
                 TemplateFormat::Yaml => {
                     let result = processing::process_yaml(&template, &environment);
-                    let output_fn = match (args.format) {
+                    let output_fn = match args.format {
                         OutputFormat::CanonicalJson => write_canonical_json,
                         OutputFormat::Yaml => write_full_yaml,
                     };
