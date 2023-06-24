@@ -29,8 +29,9 @@ enum OutputFormat {
 
 #[derive(Parser)]
 struct Args {
-    #[arg()]
+    #[arg(default_value = default_input_directory().into_os_string())]
     input_directory: PathBuf,
+    #[arg(default_value = default_output_directory().into_os_string())]
     output_directory: PathBuf,
 
     #[arg(long = "envs", default_value = default_envs_file().into_os_string())]
@@ -46,6 +47,12 @@ struct Args {
 #[test]
 fn tests_tester() {}
 
+fn default_input_directory() -> PathBuf {
+    PathBuf::from_str(".").unwrap()
+}
+fn default_output_directory() -> PathBuf {
+    PathBuf::from_str("./environments").unwrap()
+}
 fn default_envs_file() -> PathBuf {
     PathBuf::from_str("./environments.yml").unwrap()
 }
