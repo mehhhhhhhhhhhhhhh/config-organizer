@@ -1,7 +1,5 @@
+use serde::Deserialize;
 use std::collections::HashMap;
-use serde::{
-    Deserialize,
-};
 
 #[derive(Deserialize, Debug)]
 pub(crate) struct EnvironmentDefinitions {
