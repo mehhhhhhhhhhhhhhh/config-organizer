@@ -218,18 +218,24 @@ pub(crate) fn process_yaml(template: &Template, environment: &Environment) -> Va
 }
 
 fn postprocess_yaml(mut yaml_config: &mut Value) {
-    if let Some(profiles) = yaml_config.try_navigate(&vec!["spring".to_string(), "profiles".to_string()]) {
-        if let Value::Mapping(profiles) = profiles {
-            if let Some(Value::Sequence(active_profiles)) = profiles.get("active") {
-                profiles.insert(
-                    Value::String("active".to_string()),
-                    Value::String(
-                        active_profiles.iter().map(|prof| {
-                            string_value(prof).unwrap()
-                        }).collect::<Vec<_>>().join(", ")
-                    )
-                );
-            }
-        }
-    }
+    // i've left this here as an example of doing this kind of thing
+    // it can be nice to work around frameworks which have an annoying config format
+    // (unless what's annoying is that they're incompatible with json, obviously)
+
+    // however i'm commenting it out as this thing is supposed to have pure behaviour by default. fork it and build a different version for custom behaviour :)
+
+    // if let Some(profiles) = yaml_config.try_navigate(&vec!["spring".to_string(), "profiles".to_string()]) {
+    //     if let Value::Mapping(profiles) = profiles {
+    //         if let Some(Value::Sequence(active_profiles)) = profiles.get("active") {
+    //             profiles.insert(
+    //                 Value::String("active".to_string()),
+    //                 Value::String(
+    //                     active_profiles.iter().map(|prof| {
+    //                         string_value(prof).unwrap()
+    //                     }).collect::<Vec<_>>().join(", ")
+    //                 )
+    //             );
+    //         }
+    //     }
+    // }
 }
