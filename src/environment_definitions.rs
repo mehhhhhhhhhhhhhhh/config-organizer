@@ -11,7 +11,6 @@ pub(crate) struct EnvironmentDefinitions {
 #[derive(Deserialize, Debug)]
 pub(crate) struct EnvDef {
     pub configuration: ConfDef,
-    mocks: Vec<String>,
 }
 
 #[derive(Deserialize, Debug)]
