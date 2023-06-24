@@ -15,15 +15,31 @@ use std::io::{read_to_string, Write};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use clap::Parser;
+use std::str::FromStr;
+use clap::{Parser, ValueEnum};
 use serde_yaml::Value;
 use crate::processing::Environment;
+
+#[derive(Copy, Clone, Debug)]
+#[derive(ValueEnum)]
+enum OutputFormat {
+    CanonicalJson,
+    #[deprecated] Yaml,
+}
 
 #[derive(Parser)]
 struct Args {
     #[arg()]
-    directory: PathBuf,
+    input_directory: PathBuf,
+    output_directory: PathBuf,
+
+    #[deprecated]
+    #[arg(value_enum, long = "format", default_value_t = OutputFormat::CanonicalJson)]
+    format: OutputFormat,
 }
+
+#[test]
+fn tests_tester() {}
 
 struct VarDefParseCache {
     cache: HashMap<PathBuf, Rc<VariableSource>>,
@@ -103,7 +119,7 @@ fn write_canonical_json(content: &Value, output_path: &Path) -> io::Result<()> {
 
 fn main() -> io::Result<()> {
     let args = Args::parse();
-    env::set_current_dir(args.directory)?;
+    env::set_current_dir(args.input_directory)?;
 
     let envs_file = File::open("environments.yml")?;
     let env_defs : EnvironmentDefinitions = serde_yaml::from_reader(envs_file).unwrap();
@@ -154,13 +170,15 @@ fn main() -> io::Result<()> {
             match (template.format) {
                 TemplateFormat::Yaml => {
                     let result = processing::process_yaml(&template, &environment);
-                    write_full_yaml(&result, main_output_path.as_path())?;
-                    write_canonical_json(&result, canonical_output_path.as_path())?;
+                    let output_fn = match (args.format) {
+                        OutputFormat::CanonicalJson => write_canonical_json,
+                        OutputFormat::Yaml => write_full_yaml,
+                    };
+                    output_fn(&result, args.output_directory.as_path())?;
                 }
                 TemplateFormat::Text => {
                     let result = processing::process_text(&template, &environment);
-                    write_text(&result, main_output_path.as_path())?;
-                    write_text(&result, canonical_output_path.as_path())?;
+                    write_text(&result, args.output_directory.as_path())?;
                 }
             }
         }
