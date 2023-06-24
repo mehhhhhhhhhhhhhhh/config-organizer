@@ -181,29 +181,6 @@ fn expand_string(string: String, environment: &Environment) -> Value {
     Value::String(substituted.to_string())
 }
 
-// fn expand_string(string: String, environment: &Environment) -> Value {
-//     let lpos = string.find("((");
-//     let rpos = string.find("))");
-//     if let Some(lpos) = lpos {
-//         if let Some(rpos) = rpos {
-//             let reference_name = &string[lpos+2..rpos].trim();
-//             if lpos == 0 && rpos == (string.len()-2) {
-//                 return lookup(reference_name, environment).unwrap_or(Value::String(string))
-//             } else if reference_name.find("(").is_none() {  // avoid being tripped up by regexes :grimace:
-//                 let val = lookup(reference_name, environment);
-//                 let str_val = match val {
-//                     None => {return Value::String(string)},
-//                     Some(Value::Number(n)) => format!("{}", n),
-//                     Some(Value::String(str)) => str,
-//                     Some(val) => panic!("Attempted to interpolate non-string value \"{}\" ({:?})", reference_name, val),
-//                 };
-//                 return expand_string(string[..lpos].to_string() + &str_val + &string_value(&expand_string(string[rpos+2..].to_string(), environment)).unwrap(), environment)
-//             }
-//         }
-//     }
-//     Value::String(string)
-// }
-
 fn expand(mut content: Value, environment: &Environment) -> Value {
     match content {
         Value::Null => Value::Null,
