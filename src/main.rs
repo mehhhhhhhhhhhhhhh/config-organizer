@@ -8,6 +8,7 @@ use variable_definitions::VariableSource;
 
 use crate::processing::Environment;
 use clap::{Parser, ValueEnum};
+use path_clean::PathClean;
 use serde_yaml::Value;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -41,6 +42,24 @@ struct Args {
     #[arg(value_enum, long = "format", default_value_t = OutputFormat::CanonicalJson)]
     format: OutputFormat,
     // TODO control over verboseness
+}
+
+fn fix_path(path: &Path) -> PathBuf {
+    let abs_path = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        env::current_dir().unwrap().join(path)
+    };
+    abs_path.clean()
+}
+
+fn fix_paths(args: Args) -> Args {
+    Args {
+        input_directory: fix_path(&args.input_directory).to_path_buf(),
+        output_directory: fix_path(&args.output_directory).to_path_buf(),
+        environments_file_path: fix_path(&args.environments_file_path).to_path_buf(),
+        format: args.format,
+    }
 }
 
 #[test]
@@ -152,10 +171,10 @@ fn write_canonical_json(content: &Value, output_path: &Path) -> io::Result<()> {
 }
 
 fn main() -> io::Result<()> {
-    let args = Args::parse();
-    env::set_current_dir(args.input_directory)?;
+    let args = fix_paths(Args::parse());
+    env::set_current_dir(&args.input_directory)?;
 
-    let envs_file = File::open(args.environments_file_path)?;
+    let envs_file = File::open(&args.environments_file_path)?;
     let env_defs: EnvironmentDefinitions = serde_yaml::from_reader(envs_file).unwrap();
     let envs = env_defs.environments;
 
@@ -166,7 +185,7 @@ fn main() -> io::Result<()> {
     for (name, def) in envs {
         //println!("{}:\n  {:?}", &name, &def);
 
-        let mut output_dir = args.output_directory.to_path_buf();
+        let mut output_dir = args.output_directory.clone();
         output_dir.push(Path::new(&format!("{}/configs", &name)));
         fs::create_dir_all(&output_dir)?;
 
