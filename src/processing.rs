@@ -6,7 +6,7 @@ use serde_yaml::{Mapping, Sequence, Value};
 
 use std::fs::{read_to_string, File};
 
-use std::sync::{Arc, RwLock};
+use std::cell::Cell;
 use std::panic::PanicInfo;
 
 use std::path::PathBuf;
@@ -238,23 +238,35 @@ fn expand(content: Value, environment: &Environment) -> Value {
     }
 }
 
-lazy_static! {
-    static ref CURRENT_FILE : Arc<RwLock<Option<String>>> = Arc::new(RwLock::new(None));
+thread_local! {
+    static CURRENT_FILE: Cell<Option<String>> = const { Cell::new(None) };
+    static DEFAULT_HOOK: Cell<Option<Box<dyn Fn(&PanicInfo)->()>>> = const { Cell::new(None) };
 }
 
 fn panic_hook(info: &PanicInfo) {
-    if let Some(f) = CURRENT_FILE.read().unwrap().as_ref() {
-        eprintln!("\nFailed to compile \"{}\"", &f);
-    };
-    eprintln!("  {}", &info);
+    CURRENT_FILE.with(|f| {
+        if let Some(f) = f.take().as_ref() {
+            eprintln!("\nFailed to compile \"{}\"", &f);
+        };
+    });
+    DEFAULT_HOOK.with(|def_hook| {
+        def_hook.take().map(|f| f(info) );
+    });
 }
 
 fn with_error_catcher<T>(output_path: String, processor: &dyn Fn()->T) -> T {
-    CURRENT_FILE.write().unwrap().replace(output_path);
-    std::panic::set_hook(Box::new(panic_hook));
+    CURRENT_FILE.with(|f| {
+        f.set(Some(output_path));
+    });
+    DEFAULT_HOOK.with(|def_hook| {
+        def_hook.set(Some(std::panic::take_hook()));
+        std::panic::set_hook(Box::new(panic_hook));
+    });
     let content = processor();
     let _ = std::panic::take_hook();
-    CURRENT_FILE.write().unwrap().take();
+    CURRENT_FILE.with(|f| {
+        f.set(None);
+    });
     content
 }
 
