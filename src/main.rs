@@ -236,7 +236,7 @@ fn main() -> io::Result<()> {
 
             match template.format {
                 TemplateFormat::Yaml => {
-                    let result = processing::process_yaml(&template, &environment);
+                    let result = processing::process_yaml(&template, &environment, output_path.to_string_lossy().to_string());
                     let output_fn = match args.format {
                         OutputFormat::CanonicalJson => write_canonical_json,
                         OutputFormat::Yaml => write_full_yaml,
@@ -244,7 +244,7 @@ fn main() -> io::Result<()> {
                     output_fn(&result, &output_path)?;
                 }
                 TemplateFormat::Text => {
-                    let result = processing::process_text(&template, &environment);
+                    let result = processing::process_text(&template, &environment, output_path.to_string_lossy().to_string());
                     write_text(&result, &output_path)?;
                 }
             }

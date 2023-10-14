@@ -6,7 +6,8 @@ use serde_yaml::{Mapping, Sequence, Value};
 
 use std::fs::{read_to_string, File};
 
-
+use std::sync::{Arc, RwLock};
+use std::panic::PanicInfo;
 
 use std::path::PathBuf;
 
@@ -237,25 +238,49 @@ fn expand(content: Value, environment: &Environment) -> Value {
     }
 }
 
-pub(crate) fn process_text(template: &Template, environment: &Environment) -> String {
-    let text = read_to_string(&template.source_path).unwrap();
-    string_value(&expand_string(text, environment))
-        .expect("Text template somehow expanded to a non-string value")
+lazy_static! {
+    static ref CURRENT_FILE : Arc<RwLock<Option<String>>> = Arc::new(RwLock::new(None));
 }
 
-pub(crate) fn process_yaml(template: &Template, environment: &Environment) -> Value {
-    let filename = template.source_path.file_name().unwrap().to_str().unwrap();
-    let mut content: Value =
-        serde_yaml::from_reader(File::open(&template.source_path).unwrap()).unwrap();
+fn panic_hook(info: &PanicInfo) {
+    if let Some(f) = CURRENT_FILE.read().unwrap().as_ref() {
+        eprintln!("\nFailed to compile \"{}\"", &f);
+    };
+    eprintln!("  {}", &info);
+}
 
-    for mutation in &environment.definitions.mutations {
-        if mutation.filename_pattern == filename {
-            apply_mutation(&mutation.action, &mut content);
-        }
-    }
-    let mut content = expand(content, environment);
-    postprocess_yaml(&mut content);
+fn with_error_catcher<T>(output_path: String, processor: &dyn Fn()->T) -> T {
+    CURRENT_FILE.write().unwrap().replace(output_path);
+    std::panic::set_hook(Box::new(panic_hook));
+    let content = processor();
+    let _ = std::panic::take_hook();
+    CURRENT_FILE.write().unwrap().take();
     content
+}
+
+pub(crate) fn process_text(template: &Template, environment: &Environment, output_path: String) -> String {
+    with_error_catcher(output_path, &|| {
+        let text = read_to_string(&template.source_path).unwrap();
+        string_value(&expand_string(text, environment))
+            .expect("Text template somehow expanded to a non-string value")
+    })
+}
+
+pub(crate) fn process_yaml(template: &Template, environment: &Environment, output_path: String) -> Value {
+    with_error_catcher(output_path, &|| {
+        let filename = template.source_path.file_name().unwrap().to_str().unwrap();
+        let mut content: Value =
+            serde_yaml::from_reader(File::open(&template.source_path).unwrap()).unwrap();
+
+        for mutation in &environment.definitions.mutations {
+            if mutation.filename_pattern == filename {
+                apply_mutation(&mutation.action, &mut content);
+            }
+        }
+        let mut content = expand(content, environment);
+        postprocess_yaml(&mut content);
+        content
+    })
 }
 
 fn postprocess_yaml(_yaml_config: &mut Value) {
