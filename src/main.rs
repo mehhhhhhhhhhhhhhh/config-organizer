@@ -271,6 +271,9 @@ fn main() -> io::Result<()> {
     pool.join();
     match pool.panic_count() {
         0 => Ok(()),
-        n => panic!("There were {} compilation errors", n),
+        n => {
+            eprintln!("FAIL: There were {} compilation errors", n);
+            std::process::exit(1);
+        }
     }
 }
