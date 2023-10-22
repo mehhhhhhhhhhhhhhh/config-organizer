@@ -233,9 +233,9 @@ fn main() -> io::Result<()> {
         let output_dir = Arc::new(output_dir);
         for template in get_templates() {
             let filename = template.source_path.file_name().unwrap().to_str().unwrap().to_owned();
-            let environment = environment.clone();
-            let excluded_files = excluded_files.clone();
-            let output_dir = output_dir.clone();
+            let environment = Arc::clone(&environment);
+            let excluded_files = Arc::clone(&excluded_files);
+            let output_dir = Arc::clone(&output_dir);
 
             pool.execute(move|| {
                 if excluded_files
