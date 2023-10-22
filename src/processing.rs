@@ -240,17 +240,23 @@ fn expand(content: Value, environment: &Environment) -> Value {
 
 thread_local! {
     static CURRENT_FILE: Cell<Option<String>> = const { Cell::new(None) };
-    static DEFAULT_HOOK: Cell<Option<Box<dyn Fn(&PanicInfo)->()>>> = const { Cell::new(None) };
 }
 
 fn panic_hook(info: &PanicInfo) {
     CURRENT_FILE.with(|f| {
         if let Some(f) = f.take().as_ref() {
-            eprintln!("\nFailed to compile \"{}\"", &f);
+            let error = format!("{}", &info);
+            let error = if error.starts_with("panicked at '") {
+                error.trim_start_matches("panicked at '").trim_end_matches(|c|{c!='\''}).trim_end_matches('\'')
+                    // TODO stop doing this silliness once panic_info_message is stable
+                    //    https://github.com/rust-lang/rust/issues/66745
+            } else {
+                &error
+            };
+            let error = format!("Failed to compile \"{}\":\n  {}\n", &f, &error);
+            eprintln!("{}", &error);
+                // because the eprintln! is not atomic if it's got multiple chunks in it
         };
-    });
-    DEFAULT_HOOK.with(|def_hook| {
-        def_hook.take().map(|f| f(info) );
     });
 }
 
@@ -258,10 +264,7 @@ fn with_error_catcher<T>(output_path: String, processor: &dyn Fn()->T) -> T {
     CURRENT_FILE.with(|f| {
         f.set(Some(output_path));
     });
-    DEFAULT_HOOK.with(|def_hook| {
-        def_hook.set(Some(std::panic::take_hook()));
-        std::panic::set_hook(Box::new(panic_hook));
-    });
+    std::panic::set_hook(Box::new(panic_hook));
     let content = processor();
     let _ = std::panic::take_hook();
     CURRENT_FILE.with(|f| {

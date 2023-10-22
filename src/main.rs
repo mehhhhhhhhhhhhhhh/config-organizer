@@ -47,7 +47,7 @@ struct Args {
     #[arg(value_enum, long = "format", default_value_t = OutputFormat::CanonicalJson)]
     format: OutputFormat,
 
-    #[arg(default_value_t = false)]
+    #[arg(long = "verbose", short = 'v', default_value_t = false)]
     verbose: bool,
 }
 
