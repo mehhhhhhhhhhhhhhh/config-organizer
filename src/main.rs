@@ -21,6 +21,11 @@ use std::rc::Rc;
 use std::str::FromStr;
 use std::{env, fs, io};
 
+use std::sync::Arc;
+use threadpool::ThreadPool;
+
+const THREAD_COUNT: usize = 4;
+
 #[derive(Copy, Clone, Debug, ValueEnum)]
 enum OutputFormat {
     CanonicalJson,
@@ -41,7 +46,9 @@ struct Args {
     #[deprecated]
     #[arg(value_enum, long = "format", default_value_t = OutputFormat::CanonicalJson)]
     format: OutputFormat,
-    // TODO control over verboseness
+
+    #[arg(default_value_t = false)]
+    verbose: bool,
 }
 
 fn fix_path(path: &Path) -> PathBuf {
@@ -59,6 +66,7 @@ fn fix_paths(args: Args) -> Args {
         output_directory: fix_path(&args.output_directory).to_path_buf(),
         environments_file_path: fix_path(&args.environments_file_path).to_path_buf(),
         format: args.format,
+        verbose: args.verbose,
     }
 }
 
@@ -123,35 +131,35 @@ fn get_templates() -> Vec<Template> {
         .collect()
 }
 
-fn write_text(content: &str, output_path: &Path) -> io::Result<()> {
+fn write_text(content: &str, output_path: &Path, verbose: bool) -> io::Result<()> {
     if let Some(true) = File::open(output_path)
         .ok()
         .and_then(|f| Some(read_to_string(f).ok()? == content))
     {
-        eprintln!("Unchanged {output_path:?}");
+        if verbose { eprintln!("Unchanged {output_path:?}"); };
         return Ok(());
     }
-    eprintln!("Writing {output_path:?}");
+    if verbose { eprintln!("Writing {output_path:?}"); };
 
     let mut output_file = File::create(output_path)?;
     output_file.write_all(content.as_bytes())
 }
 
-fn write_full_yaml(content: &Value, output_path: &Path) -> io::Result<()> {
+fn write_full_yaml(content: &Value, output_path: &Path, verbose: bool) -> io::Result<()> {
     if let Some(true) = File::open(output_path).ok().and_then(|f| {
         Some(read_to_string(f).ok()? == serde_yaml::to_string(content).expect("YAML error"))
     }) {
-        eprintln!("Unchanged {output_path:?}");
+        if verbose { eprintln!("Unchanged {output_path:?}"); };
         return Ok(());
     }
-    eprintln!("Writing {output_path:?}");
+    if verbose { eprintln!("Writing {output_path:?}"); };
 
     let output_file = File::create(output_path)?;
     serde_yaml::to_writer(output_file, content)
         .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))
 }
 
-fn write_canonical_json(content: &Value, output_path: &Path) -> io::Result<()> {
+fn write_canonical_json(content: &Value, output_path: &Path, verbose: bool) -> io::Result<()> {
     let canonical_json =
         json_canon::to_string(&serde_json::to_value(content).expect("JSON conversion error"))
             .expect("Canonical JSON error");
@@ -160,10 +168,10 @@ fn write_canonical_json(content: &Value, output_path: &Path) -> io::Result<()> {
         .ok()
         .and_then(|f| Some(read_to_string(f).ok()? == (canonical_json.clone() + "\n")))
     {
-        eprintln!("Unchanged {output_path:?}");
+        if verbose { eprintln!("Unchanged {output_path:?}"); };
         return Ok(());
     }
-    eprintln!("Writing {output_path:?}");
+    if verbose { eprintln!("Writing {output_path:?}"); };
 
     // Note: this is RFC 8785 canonical json -- not the weird OLPC bullshit, which we can't use as it forbids floats.
     let mut output_file = File::create(output_path)?;
@@ -181,6 +189,8 @@ fn main() -> io::Result<()> {
     let mut cache = VarDefParseCache {
         cache: Default::default(),
     };
+
+    let pool = ThreadPool::with_name("compiler".into(), THREAD_COUNT);
 
     for (name, def) in envs {
         //println!("{}:\n  {:?}", &name, &def);
@@ -218,37 +228,49 @@ fn main() -> io::Result<()> {
                 .collect(),
         };
 
+        let environment = Arc::new(environment);
+        let excluded_files = Arc::new(def.configuration.excluded_files);
+        let output_dir = Arc::new(output_dir);
         for template in get_templates() {
-            let filename = template.source_path.file_name().unwrap().to_str().unwrap();
-            if def
-                .configuration
-                .excluded_files
-                .iter()
-                .any(|ex_fn| ex_fn == filename)
-            {
-                eprintln!("Skipping {}", &filename);
-                continue;
-            }
-            let output_path = output_dir
-                .join(template.source_path.file_name().unwrap().to_str().unwrap())
-                .as_path()
-                .to_owned();
+            let filename = template.source_path.file_name().unwrap().to_str().unwrap().to_owned();
+            let environment = environment.clone();
+            let excluded_files = excluded_files.clone();
+            let output_dir = output_dir.clone();
 
-            match template.format {
-                TemplateFormat::Yaml => {
-                    let result = processing::process_yaml(&template, &environment, output_path.to_string_lossy().to_string());
-                    let output_fn = match args.format {
-                        OutputFormat::CanonicalJson => write_canonical_json,
-                        OutputFormat::Yaml => write_full_yaml,
-                    };
-                    output_fn(&result, &output_path)?;
+            pool.execute(move|| {
+                if excluded_files
+                    .iter()
+                    .any(|ex_fn| ex_fn == &filename)
+                {
+                    if args.verbose { eprintln!("Skipping {}", &filename); };
+                    return;
                 }
-                TemplateFormat::Text => {
-                    let result = processing::process_text(&template, &environment, output_path.to_string_lossy().to_string());
-                    write_text(&result, &output_path)?;
+                let output_path = output_dir
+                    .join(template.source_path.file_name().unwrap().to_str().unwrap())
+                    .as_path()
+                    .to_owned();
+
+                match template.format {
+                    TemplateFormat::Yaml => {
+                        let result = processing::process_yaml(&template, &environment, output_path.to_string_lossy().to_string());
+                        let output_fn = match args.format {
+                            OutputFormat::CanonicalJson => write_canonical_json,
+                            OutputFormat::Yaml => write_full_yaml,
+                        };
+                        output_fn(&result, &output_path, args.verbose).expect(&format!("Failed to write to {:?}", &output_path));
+                    }
+                    TemplateFormat::Text => {
+                        let result = processing::process_text(&template, &environment, output_path.to_string_lossy().to_string());
+                        write_text(&result, &output_path, args.verbose).expect(&format!("Failed to write to {:?}", &output_path));
+                    }
                 }
-            }
+            })
         }
     }
-    Ok(())
+
+    pool.join();
+    match pool.panic_count() {
+        0 => Ok(()),
+        n => panic!("There were {} compilation errors", n),
+    }
 }
