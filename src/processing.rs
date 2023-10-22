@@ -266,7 +266,6 @@ fn with_error_catcher<T>(output_path: String, processor: &dyn Fn()->T) -> T {
     });
     std::panic::set_hook(Box::new(panic_hook));
     let content = processor();
-    let _ = std::panic::take_hook();
     CURRENT_FILE.with(|f| {
         f.set(None);
     });
