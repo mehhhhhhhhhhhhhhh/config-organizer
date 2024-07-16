@@ -11,8 +11,8 @@ This repo is an attempt to alleviate the problem by generating configuration fil
 
 * JSON lets you know for sure if you're having the Norway problem (`Norway` ISO country code => `NO` => `false` in YAML).
 
-* This project provides a simple templating system (substituting value for placeholder variables, depending on the target "environment").
-    * The input to the templating system is YAML, for convenience.
+* This project provides a simple templating system (substituting different values for placeholder variables, depending on the target "environment").
+    * All the input to the templating system is YAML, for convenience.
         * Specifically it's `serde_yaml` from Rust, which generally omits YAML's most confusing features.
-    * Plain text files are also natively supported as output (with string-only templating, or optionally embedded JSON values).
-    * Special filters for nonstandard input or output can be easily hacked in.
+    * Plain text templates are also natively supported for output (with string-only templating, or optionally embedded JSON values).
+    * Special filters, for extra processing of inputs or outputs, can be easily hacked in.
