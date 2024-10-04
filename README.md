@@ -1,3 +1,6 @@
+Organizing configuration
+------------------------
+
 In this repo we're trying again at the eternal struggle to make things convenient without letting them become too confusing.
 
 In a situation where you've standardized on a set of deployable items that accept YAML configuration, life can be great until you're let down by inconsistent specifications (of YAML, for a start).
@@ -10,7 +13,8 @@ This repo is an attempt to alleviate the problem by generating configuration fil
 
 * JSON lets you know for sure if you're having the Norway problem (`Norway` ISO country code => `NO` => `false` in YAML).
 
-Although not all possible YAML is representable as valid JSON, for example JSON keys must always be strings. Most systems only need JSON in practice, at least.
+> [!NOTE]
+> Not all possible YAML is representable as valid JSON, for example JSON keys must always be strings. Most systems only need JSON in practice, at least.
 
 This project provides a simple templating system (substituting different values for placeholder variables, depending on the target "environment").
 
