@@ -13,10 +13,13 @@ This repo is an attempt to alleviate the problem by generating configuration fil
 Although not all possible YAML is representable as valid JSON, for example JSON keys must always be strings. Most systems only need JSON in practice, at least.
 
 This project provides a simple templating system (substituting different values for placeholder variables, depending on the target "environment").
-    * All the input to the templating system is YAML, for convenience.
+
+* All the input to the templating system is YAML, for convenience.    
         * Specifically it's parsed by `serde_yaml` from Rust, which generally omits YAML's most confusing optional/deprecated features.
-    * Plain text templates are also natively supported for output (with string-only substitution, or optionally, embedded canonical JSON values).
-    * Special filters, for extra processing of inputs or outputs, can be easily hacked in.
+  
+* Plain text templates are also natively supported for output (with string-only substitution, or optionally, embedded canonical JSON values).
+
+* Special filters, for extra processing of inputs or outputs, can be easily hacked in.
 
 
 History
