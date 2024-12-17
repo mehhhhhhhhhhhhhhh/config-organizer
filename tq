@@ -1,0 +1,22 @@
+#!/bin/sh -e
+
+filename="$1"
+if [[ -z "$filename" ]]; then
+	filename='-'
+else
+	shift
+fi
+
+canonicalized()(
+	if [[ "$filename" == '-' ]]; then
+		toml-canonicalizer
+	else
+		toml-canonicalizer "$filename"
+	fi
+)
+
+if (( $# > 0 )); then
+	canonicalized | jq "$@"
+else
+	canonicalized | jq '.'
+fi
