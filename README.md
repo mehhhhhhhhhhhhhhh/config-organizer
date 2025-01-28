@@ -14,7 +14,7 @@ This repo is an attempt to alleviate the problem by **generating configuration f
 * JSON lets you know for sure if you're having the Norway problem (`Norway` ISO country code => `NO` => `false` in YAML).
 
 > [!NOTE]
-> Not all possible YAML is representable as valid JSON, for example JSON keys must always be strings. Most systems only need JSON in practice, at least.
+> While all JSON is valid YAML, not all possible YAML is representable as valid JSON. For example, JSON keys must always be strings. Most systems only need JSON capabilities in practice, at least.
 
 What is this, then?
 -------------------
