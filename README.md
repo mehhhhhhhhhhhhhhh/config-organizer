@@ -44,7 +44,7 @@ I believe the simplicity of the approach here is its main strength -- it's easy 
 Testing
 -------
 
-This repo is somewhat light on testing as the implementation was initially tested in context with the real configurations, simply by checking whether its output agreed with the prototype Ruby implementation. The major benefit ef using canonical JSON -- the elimination of trivial formatting differences -- is useful in this situation as in many others.
+This repo is somewhat light on testing as the implementation was initially tested in context with the real configurations, simply by checking whether its output agreed with the prototype Ruby implementation. The major benefit of using canonical JSON -- the elimination of trivial formatting differences -- is useful in this situation as in many others.
 
 As Ruby's Psych YAML parser implements some semi-deprecated features from different versions of YAML that Rust's serde_yaml does not, this had the pleasant side effect of also failing where ambiguous forms of input were used.
 
